@@ -22,6 +22,7 @@ import {
   applyConfigOverrides,
   getProviderConfigOverrides,
   getAllProvidersInfo,
+  getProviderDefaultTimeout,
   applyModelOverrides,
   normalizeDisabledModels,
   getRegisteredProviderIds,
@@ -859,6 +860,24 @@ describe('Provider Configuration', () => {
       const providers = getAllProvidersInfo();
       const claude = providers.find(p => p.id === 'claude');
       expect(claude.defaultTimeout).toBeUndefined();
+    });
+
+    it('should apply configured defaultTimeout to a standard provider', () => {
+      const ClaudeClass = getProviderClass('claude');
+
+      applyConfigOverrides({
+        providers: {
+          claude: { defaultTimeout: 1800000 }
+        }
+      });
+
+      expect(getProviderDefaultTimeout('claude')).toBe(1800000);
+      expect(getProviderDefaultTimeout('claude', { defaultTimeout: 1200000 })).toBe(1200000);
+      expect(getAllProvidersInfo().find(p => p.id === 'claude').defaultTimeout).toBe(1800000);
+      expect(ClaudeClass.defaultTimeout).toBeUndefined();
+
+      applyConfigOverrides({ providers: {} });
+      expect(getProviderDefaultTimeout('claude')).toBeUndefined();
     });
   });
 

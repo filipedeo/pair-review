@@ -22,6 +22,7 @@ const {
   DEFAULT_AVAILABILITY_TIMEOUT_MS,
   applyConfigOverrides,
   getProviderConfigOverrides,
+  getProviderDefaultTimeout,
   inferModelDefaults,
   resolveDefaultModel,
   resolveCliModelConfig,
@@ -86,6 +87,7 @@ module.exports = {
   // Config override support
   applyConfigOverrides,
   getProviderConfigOverrides,
+  getProviderDefaultTimeout,
   inferModelDefaults,
   resolveDefaultModel,
   resolveCliModelConfig,

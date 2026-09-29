@@ -755,6 +755,7 @@ function applyConfigOverrides(config) {
         app_extensions: providerConfig.app_extensions,
         advisor: providerConfig.advisor,
         availability_timeout_seconds: providerConfig.availability_timeout_seconds,
+        defaultTimeout: providerConfig.defaultTimeout,
         models: AliasClass.getModels() !== BaseClass.getModels() ? AliasClass.getModels() : null,
         disabled_models: aliasDisabled,
         default_model: aliasDefault
@@ -814,6 +815,7 @@ function applyConfigOverrides(config) {
       app_extensions: providerConfig.app_extensions,
       advisor: providerConfig.advisor,
       availability_timeout_seconds: providerConfig.availability_timeout_seconds,
+      defaultTimeout: providerConfig.defaultTimeout,
       models: processedModels,
       disabled_models: disabledModels,
       default_model: defaultModel
@@ -830,6 +832,20 @@ function applyConfigOverrides(config) {
  */
 function getProviderConfigOverrides(providerId) {
   return providerConfigOverrides.get(providerId);
+}
+
+/**
+ * Get the effective analysis timeout for a provider.
+ * Per-call overrides win over configured provider defaults, which win over
+ * the provider class default.
+ * @param {string} providerId - Provider ID
+ * @param {Object|null} overrides - Optional per-call provider overrides
+ * @returns {number|undefined} Timeout in milliseconds
+ */
+function getProviderDefaultTimeout(providerId, overrides = null) {
+  return overrides?.defaultTimeout
+    ?? providerConfigOverrides.get(providerId)?.defaultTimeout
+    ?? providerRegistry.get(providerId)?.defaultTimeout;
 }
 
 /**
@@ -1029,6 +1045,7 @@ function getAllProvidersInfo() {
 
     // Use overridden install instructions if available
     const installInstructions = overrides?.installInstructions || ProviderClass.getInstallInstructions();
+    const defaultTimeout = getProviderDefaultTimeout(id, overrides);
 
     // Build capabilities: executable providers define their own, others get defaults
     const capabilities = ProviderClass.capabilities || {
@@ -1046,7 +1063,7 @@ function getAllProvidersInfo() {
       installInstructions,
       capabilities,
       isExecutable: ProviderClass.isExecutable || false,
-      ...(ProviderClass.defaultTimeout != null ? { defaultTimeout: ProviderClass.defaultTimeout } : {})
+      ...(defaultTimeout != null ? { defaultTimeout } : {})
     });
   }
   return providers;
@@ -1194,6 +1211,7 @@ module.exports = {
   applyConfigOverrides,
   createAliasedProviderClass,
   getProviderConfigOverrides,
+  getProviderDefaultTimeout,
   inferModelDefaults,
   resolveDefaultModel,
   resolveCliModelConfig,
