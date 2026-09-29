@@ -1,5 +1,5 @@
 // Copyright 2026 Tim Perkins (tjwp) | SPDX-License-Identifier: Apache-2.0
-const { createProvider, getProviderClass, getProviderDefaultTimeout } = require('./index');
+const { createProvider, getProviderClass, getProviderExecutionTimeout } = require('./index');
 const os = require('os');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
@@ -101,7 +101,7 @@ function buildVoiceContext(voice, idx, instructions, progressCallback, db, provi
   const voiceProvider = isExecutable ? createProvider(voice.provider, voice.model, effectiveOverrides) : null;
 
   const voiceTier = voice.tier || 'balanced';
-  const voiceTimeout = voice.timeout || getProviderDefaultTimeout(voice.provider, effectiveOverrides) || 600000;
+  const voiceTimeout = voice.timeout || getProviderExecutionTimeout(voice.provider, effectiveOverrides) || 600000;
 
   // Wrap progress callback with voice-centric metadata
   const voiceProgressCallback = progressCallback ? (update) => {
@@ -458,7 +458,7 @@ class Analyzer {
     const { analysisId, skipRunCreation, skipLevel3, reviewerNum, excludePrevious, serverPort, githubClient } = options;
     const logPrefix = options.logPrefix || '';
     // Respect per-call, configured, and provider-class timeout defaults.
-    const providerTimeout = getProviderDefaultTimeout(this.provider, this.providerOverrides);
+    const providerTimeout = getProviderExecutionTimeout(this.provider, this.providerOverrides);
     const executionTimeout = options.timeout || providerTimeout || 600000; // Default 10 minutes
 
     // Resolve enabledLevels: prefer explicit option, fall back to skipLevel3 compat
@@ -2877,7 +2877,7 @@ File-level suggestions should NOT have a line number. They apply to the entire f
       // Create the consolidation provider with its own config, then resolve its timeout.
       const providerId = providerOverride || this.provider;
       const providerOverrides = this.providerOverridesMap?.[providerId] || this.providerOverrides;
-      const executionTimeout = timeout || getProviderDefaultTimeout(providerId, providerOverrides) || 600000;
+      const executionTimeout = timeout || getProviderExecutionTimeout(providerId, providerOverrides) || 600000;
       const aiProvider = createProvider(providerId, modelOverride || this.model, providerOverrides);
 
       // Pre-fetch existing PR review comments for dedup (replaces the prior
@@ -3722,7 +3722,7 @@ File-level suggestions should NOT have a line number. They apply to the entire f
           provider: voice.provider,
           model: voice.model,
           tier,
-          timeout: voice.timeout || getProviderDefaultTimeout(voice.provider, voiceProviderOverrides) || 600000,
+          timeout: voice.timeout || getProviderExecutionTimeout(voice.provider, voiceProviderOverrides) || 600000,
           customInstructions: voiceInstructions,
           voiceCustomInstructions: voice.customInstructions || null,
           providerOverrides: voiceProviderOverrides
@@ -4091,7 +4091,7 @@ File-level suggestions should NOT have a line number. They apply to the entire f
    */
   async _intraLevelConsolidate(level, voiceGroups, prMetadata, customInstructions, worktreePath, orchConfig) {
     const { provider, model, tier, timeout, analysisId, progressCallback, reviewerCount, providerOverrides } = orchConfig;
-    const executionTimeout = timeout || getProviderDefaultTimeout(provider, providerOverrides) || 300000;
+    const executionTimeout = timeout || getProviderExecutionTimeout(provider, providerOverrides) || 300000;
 
     const aiProvider = createProvider(provider, model, providerOverrides || {});
 
@@ -4278,7 +4278,7 @@ File-level suggestions should NOT have a line number. They apply to the entire f
    */
   async _crossVoiceConsolidate(voiceReviews, prMetadata, customInstructions, worktreePath, config) {
     const { provider, model, tier, timeout, analysisId, progressCallback, excludePrevious, dedupContext, githubClient, providerOverrides } = config;
-    const executionTimeout = timeout || getProviderDefaultTimeout(provider, providerOverrides) || 300000;
+    const executionTimeout = timeout || getProviderExecutionTimeout(provider, providerOverrides) || 300000;
 
     const aiProvider = createProvider(provider, model, providerOverrides || {});
 

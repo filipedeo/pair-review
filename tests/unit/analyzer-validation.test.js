@@ -1996,7 +1996,7 @@ describe('Analyzer timeout threading (source verification)', () => {
     expect(orchMatch[1]).toContain('timeout');
     expect(orchMatch[1]).not.toMatch(/timeout\s*=\s*600000/);
     expect(analyzerSource).toMatch(
-      /const executionTimeout = timeout \|\| getProviderDefaultTimeout\(providerId, providerOverrides\) \|\| 600000/
+      /const executionTimeout = timeout \|\| getProviderExecutionTimeout\(providerId, providerOverrides\) \|\| 600000/
     );
   });
 
@@ -2030,21 +2030,21 @@ describe('Analyzer timeout threading (source verification)', () => {
     );
     expect(allLevelsMatch).not.toBeNull();
     expect(analyzerSource).toContain(
-      'const providerTimeout = getProviderDefaultTimeout(this.provider, this.providerOverrides)'
+      'const providerTimeout = getProviderExecutionTimeout(this.provider, this.providerOverrides)'
     );
     expect(analyzerSource).toContain('timeout: executionTimeout');
   });
 
   it('voice-centric council should resolve and pass the voice timeout', () => {
     expect(analyzerSource).toMatch(
-      /voiceTimeout\s*=\s*voice\.timeout\s*\|\|\s*getProviderDefaultTimeout\(voice\.provider, effectiveOverrides\)\s*\|\|\s*600000/
+      /voiceTimeout\s*=\s*voice\.timeout\s*\|\|\s*getProviderExecutionTimeout\(voice\.provider, effectiveOverrides\)\s*\|\|\s*600000/
     );
     expect(analyzerSource).toContain('timeout: voiceTimeout');
   });
 
   it('level-centric council should resolve timeout from per-voice overrides', () => {
     const voiceTaskPush = analyzerSource.match(
-      /voiceTasks\.push\(\{[\s\S]*?timeout:\s*voice\.timeout\s*\|\|\s*getProviderDefaultTimeout\(voice\.provider, voiceProviderOverrides\)\s*\|\|\s*600000[\s\S]*?providerOverrides:\s*voiceProviderOverrides[\s\S]*?\}\)/
+      /voiceTasks\.push\(\{[\s\S]*?timeout:\s*voice\.timeout\s*\|\|\s*getProviderExecutionTimeout\(voice\.provider, voiceProviderOverrides\)\s*\|\|\s*600000[\s\S]*?providerOverrides:\s*voiceProviderOverrides[\s\S]*?\}\)/
     );
     expect(voiceTaskPush).not.toBeNull();
   });

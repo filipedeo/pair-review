@@ -656,7 +656,7 @@ describe('Per-voice provider overrides (providerOverridesMap)', () => {
         'const voiceProviderOverrides = this.providerOverridesMap?.[voice.provider] || this.providerOverrides'
       );
       expect(analyzerSource).toContain(
-        'getProviderDefaultTimeout(voice.provider, voiceProviderOverrides)'
+        'getProviderExecutionTimeout(voice.provider, voiceProviderOverrides)'
       );
       expect(analyzerSource).toContain('providerOverrides: voiceProviderOverrides');
     });

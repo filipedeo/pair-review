@@ -855,28 +855,51 @@ function getProviderConfigOverrides(providerId) {
 }
 
 /**
- * Get the effective analysis timeout for a provider.
- * Per-call overrides win over configured provider defaults, which win over
- * the provider class default.
+ * Resolve timeout precedence while optionally preserving zero for metadata.
  * @param {string} providerId - Provider ID
  * @param {Object|null} overrides - Optional per-call provider overrides
+ * @param {boolean} preserveZero - Whether zero is a resolved value
  * @returns {number|undefined} Timeout in milliseconds
  */
-function getProviderDefaultTimeout(providerId, overrides = null) {
+function resolveProviderDefaultTimeout(providerId, overrides, preserveZero) {
   const perCallTimeout = normalizeDefaultTimeout(providerId, overrides?.defaultTimeout, 'per-call');
-  if (perCallTimeout != null) return perCallTimeout;
+  if (perCallTimeout != null && (preserveZero || perCallTimeout > 0)) return perCallTimeout;
 
   const configuredTimeout = normalizeDefaultTimeout(
     providerId,
     providerConfigOverrides.get(providerId)?.defaultTimeout
   );
-  if (configuredTimeout != null) return configuredTimeout;
+  if (configuredTimeout != null && (preserveZero || configuredTimeout > 0)) return configuredTimeout;
 
-  return normalizeDefaultTimeout(
+  const providerTimeout = normalizeDefaultTimeout(
     providerId,
     providerRegistry.get(providerId)?.defaultTimeout,
     'provider-class'
   );
+  return providerTimeout != null && (preserveZero || providerTimeout > 0)
+    ? providerTimeout
+    : undefined;
+}
+
+/**
+ * Get the configured timeout exposed in provider metadata. Zero is preserved.
+ * @param {string} providerId - Provider ID
+ * @param {Object|null} overrides - Optional per-call provider overrides
+ * @returns {number|undefined} Timeout in milliseconds
+ */
+function getProviderDefaultTimeout(providerId, overrides = null) {
+  return resolveProviderDefaultTimeout(providerId, overrides, true);
+}
+
+/**
+ * Get the positive timeout used for analysis execution. Zero is treated as
+ * unset at each precedence layer so resolution can reach the provider class.
+ * @param {string} providerId - Provider ID
+ * @param {Object|null} overrides - Optional per-call provider overrides
+ * @returns {number|undefined} Timeout in milliseconds
+ */
+function getProviderExecutionTimeout(providerId, overrides = null) {
+  return resolveProviderDefaultTimeout(providerId, overrides, false);
 }
 
 /**
@@ -1243,6 +1266,7 @@ module.exports = {
   createAliasedProviderClass,
   getProviderConfigOverrides,
   getProviderDefaultTimeout,
+  getProviderExecutionTimeout,
   inferModelDefaults,
   resolveDefaultModel,
   resolveCliModelConfig,

@@ -554,10 +554,11 @@ describe('runCouncilAnalysis intra-level consolidation failure (issue #560)', ()
 });
 
 describe('reviewer-centric provider timeout selection', () => {
-  it('uses per-voice overrides before configured and provider-class defaults', async () => {
+  it('uses positive overrides and skips configured zero to the provider-class default', async () => {
     const sharedOverrides = { load_skills: true };
     const providerOverridesMap = {
-      claude: { load_skills: false, defaultTimeout: 1800000 }
+      claude: { load_skills: false, defaultTimeout: 1800000 },
+      pi: { load_skills: false, defaultTimeout: 0 }
     };
     const analyzer = new Analyzer({}, 'council', 'council', sharedOverrides, providerOverridesMap);
     analyzer.loadGeneratedFilePatterns = vi.fn().mockResolvedValue([]);
@@ -605,7 +606,7 @@ describe('reviewer-centric provider timeout selection', () => {
       expect(callsByModel.default.options.timeout).toBe(900000);
       expect(callsByModel.explicit.providerOverrides).toBe(providerOverridesMap.claude);
       expect(callsByModel.configured.providerOverrides).toBe(providerOverridesMap.claude);
-      expect(callsByModel.default.providerOverrides).toBe(sharedOverrides);
+      expect(callsByModel.default.providerOverrides).toBe(providerOverridesMap.pi);
 
       const consolidationConfig = analyzer._crossVoiceConsolidate.mock.calls[0].at(-1);
       expect(consolidationConfig.providerOverrides).toBe(providerOverridesMap.claude);
