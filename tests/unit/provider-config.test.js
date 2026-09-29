@@ -879,6 +879,51 @@ describe('Provider Configuration', () => {
       applyConfigOverrides({ providers: {} });
       expect(getProviderDefaultTimeout('claude')).toBeUndefined();
     });
+
+    it('should preserve zero defaultTimeout metadata for a standard provider', () => {
+      applyConfigOverrides({ providers: { claude: { defaultTimeout: 0 } } });
+
+      expect(getProviderDefaultTimeout('claude')).toBe(0);
+      expect(getAllProvidersInfo().find(p => p.id === 'claude').defaultTimeout).toBe(0);
+
+      applyConfigOverrides({ providers: {} });
+    });
+
+    it.each([
+      ['a string', '30m'],
+      ['NaN', Number.NaN],
+      ['a negative number', -1]
+    ])('should ignore %s as configured defaultTimeout', (_label, value) => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+
+      try {
+        applyConfigOverrides({ providers: { claude: { defaultTimeout: value } } });
+
+        expect(getProviderDefaultTimeout('claude')).toBeUndefined();
+        expect(getAllProvidersInfo().find(p => p.id === 'claude').defaultTimeout).toBeUndefined();
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('defaultTimeout must be a finite non-negative number')
+        );
+      } finally {
+        applyConfigOverrides({ providers: {} });
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('should ignore an invalid per-call timeout and use the configured default', () => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      applyConfigOverrides({ providers: { claude: { defaultTimeout: 1800000 } } });
+
+      try {
+        expect(getProviderDefaultTimeout('claude', { defaultTimeout: -1 })).toBe(1800000);
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('per-call defaultTimeout must be a finite non-negative number')
+        );
+      } finally {
+        applyConfigOverrides({ providers: {} });
+        warnSpy.mockRestore();
+      }
+    });
   });
 
   describe('yolo mode propagation', () => {

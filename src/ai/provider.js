@@ -654,6 +654,23 @@ function resolveDefaultModel(models, preferredId = null) {
 }
 
 /**
+ * Keep zero-valued timeout metadata for compatibility while rejecting
+ * malformed values before they reach the analyzer.
+ * @param {string} providerId - Provider ID used in warnings
+ * @param {*} value - Candidate timeout in milliseconds
+ * @param {string} source - Configuration source used in warnings
+ * @returns {number|undefined} A finite non-negative timeout
+ */
+function normalizeDefaultTimeout(providerId, value, source = 'configured') {
+  if (value == null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    logger.warn(`Provider "${providerId}": ${source} defaultTimeout must be a finite non-negative number; ignoring "${String(value)}".`);
+    return undefined;
+  }
+  return value;
+}
+
+/**
  * Create an aliased provider class that reuses an existing provider's implementation
  * but with a different ID, name, and config overrides.
  *
@@ -679,8 +696,9 @@ function createAliasedProviderClass(aliasId, BaseClass, aliasConfig) {
   if (aliasConfig.installInstructions) {
     AliasedProvider.getInstallInstructions = () => aliasConfig.installInstructions;
   }
-  if (aliasConfig.defaultTimeout != null) {
-    AliasedProvider.defaultTimeout = aliasConfig.defaultTimeout;
+  const defaultTimeout = normalizeDefaultTimeout(aliasId, aliasConfig.defaultTimeout);
+  if (defaultTimeout != null) {
+    AliasedProvider.defaultTimeout = defaultTimeout;
   }
 
   return AliasedProvider;
@@ -709,6 +727,7 @@ function applyConfigOverrides(config) {
 
   for (const [providerId, providerConfig] of Object.entries(providersConfig)) {
     logger.debug(`Applying config overrides for provider: ${providerId}`);
+    const defaultTimeout = normalizeDefaultTimeout(providerId, providerConfig.defaultTimeout);
 
     // Executable providers: dynamically create and register a provider class
     if (providerConfig.type === 'executable') {
@@ -725,6 +744,7 @@ function applyConfigOverrides(config) {
       validateModelSelectors(providerId, ExecClass.getModels(), null, execDisabled, execDefault);
       providerConfigOverrides.set(providerId, {
         ...providerConfig,
+        defaultTimeout,
         models: ExecClass.getModels(),
         disabled_models: execDisabled,
         default_model: execDefault
@@ -736,7 +756,7 @@ function applyConfigOverrides(config) {
     // Type matching a registered provider ID creates an alias of that provider
     if (providerConfig.type && providerConfig.type !== providerId && providerRegistry.has(providerConfig.type)) {
       const BaseClass = providerRegistry.get(providerConfig.type);
-      const AliasClass = createAliasedProviderClass(providerId, BaseClass, providerConfig);
+      const AliasClass = createAliasedProviderClass(providerId, BaseClass, { ...providerConfig, defaultTimeout });
       registerProvider(providerId, AliasClass);
 
       const aliasDisabled = normalizeDisabledModels(providerId, providerConfig.disabled_models);
@@ -755,7 +775,7 @@ function applyConfigOverrides(config) {
         app_extensions: providerConfig.app_extensions,
         advisor: providerConfig.advisor,
         availability_timeout_seconds: providerConfig.availability_timeout_seconds,
-        defaultTimeout: providerConfig.defaultTimeout,
+        defaultTimeout,
         models: AliasClass.getModels() !== BaseClass.getModels() ? AliasClass.getModels() : null,
         disabled_models: aliasDisabled,
         default_model: aliasDefault
@@ -815,7 +835,7 @@ function applyConfigOverrides(config) {
       app_extensions: providerConfig.app_extensions,
       advisor: providerConfig.advisor,
       availability_timeout_seconds: providerConfig.availability_timeout_seconds,
-      defaultTimeout: providerConfig.defaultTimeout,
+      defaultTimeout,
       models: processedModels,
       disabled_models: disabledModels,
       default_model: defaultModel
@@ -843,9 +863,20 @@ function getProviderConfigOverrides(providerId) {
  * @returns {number|undefined} Timeout in milliseconds
  */
 function getProviderDefaultTimeout(providerId, overrides = null) {
-  return overrides?.defaultTimeout
-    ?? providerConfigOverrides.get(providerId)?.defaultTimeout
-    ?? providerRegistry.get(providerId)?.defaultTimeout;
+  const perCallTimeout = normalizeDefaultTimeout(providerId, overrides?.defaultTimeout, 'per-call');
+  if (perCallTimeout != null) return perCallTimeout;
+
+  const configuredTimeout = normalizeDefaultTimeout(
+    providerId,
+    providerConfigOverrides.get(providerId)?.defaultTimeout
+  );
+  if (configuredTimeout != null) return configuredTimeout;
+
+  return normalizeDefaultTimeout(
+    providerId,
+    providerRegistry.get(providerId)?.defaultTimeout,
+    'provider-class'
+  );
 }
 
 /**

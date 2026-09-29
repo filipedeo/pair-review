@@ -552,3 +552,65 @@ describe('runCouncilAnalysis intra-level consolidation failure (issue #560)', ()
     }
   });
 });
+
+describe('reviewer-centric provider timeout selection', () => {
+  it('uses per-voice overrides before configured and provider-class defaults', async () => {
+    const sharedOverrides = { load_skills: true };
+    const providerOverridesMap = {
+      claude: { load_skills: false, defaultTimeout: 1800000 }
+    };
+    const analyzer = new Analyzer({}, 'council', 'council', sharedOverrides, providerOverridesMap);
+    analyzer.loadGeneratedFilePatterns = vi.fn().mockResolvedValue([]);
+    analyzer.storeSuggestions = vi.fn().mockResolvedValue(undefined);
+    analyzer.validateAndFinalizeSuggestions = vi.fn().mockImplementation((suggestions) => suggestions || []);
+    analyzer._crossVoiceConsolidate = vi.fn().mockResolvedValue({ suggestions: [], summary: 'done' });
+
+    const voiceCalls = [];
+    const analyzeAllLevels = vi.spyOn(Analyzer.prototype, 'analyzeAllLevels').mockImplementation(function (...args) {
+      voiceCalls.push({
+        provider: this.provider,
+        model: this.model,
+        providerOverrides: this.providerOverrides,
+        options: args.at(-1)
+      });
+      return Promise.resolve({ suggestions: [
+        { file: 'src/a.js', line_start: 1, line_end: 1, type: 'bug', title: this.model, description: 'd', confidence: 0.9 }
+      ], summary: this.model });
+    });
+
+    try {
+      await analyzer.runReviewerCentricCouncil(
+        {
+          reviewId: 1,
+          worktreePath: '/nonexistent-worktree',
+          prMetadata,
+          changedFiles: ['src/a.js'],
+          instructions: null
+        },
+        {
+          voices: [
+            { provider: 'claude', model: 'explicit', timeout: 700000 },
+            { provider: 'claude', model: 'configured' },
+            { provider: 'pi', model: 'default' }
+          ],
+          levels: { '1': true, '2': false, '3': false },
+          consolidation: { provider: 'claude', model: 'opus', tier: 'balanced' }
+        },
+        { runId: 'reviewer-centric-timeout-run' }
+      );
+
+      const callsByModel = Object.fromEntries(voiceCalls.map((call) => [call.model, call]));
+      expect(callsByModel.explicit.options.timeout).toBe(700000);
+      expect(callsByModel.configured.options.timeout).toBe(1800000);
+      expect(callsByModel.default.options.timeout).toBe(900000);
+      expect(callsByModel.explicit.providerOverrides).toBe(providerOverridesMap.claude);
+      expect(callsByModel.configured.providerOverrides).toBe(providerOverridesMap.claude);
+      expect(callsByModel.default.providerOverrides).toBe(sharedOverrides);
+
+      const consolidationConfig = analyzer._crossVoiceConsolidate.mock.calls[0].at(-1);
+      expect(consolidationConfig.providerOverrides).toBe(providerOverridesMap.claude);
+    } finally {
+      analyzeAllLevels.mockRestore();
+    }
+  });
+});
